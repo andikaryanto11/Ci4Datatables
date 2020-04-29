@@ -1,0 +1,20 @@
+{
+    "name": "andikaryanto11/ci4datatables",
+    "description": "Datatable serverside for ci4",
+    "keywords": ["codeigniter4", "codeigniter", "datatables"],
+    "homepage": "https://packagist.org/packages/andikaryanto11/ci4datatable",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^7.2",
+        "andikaryanto11/ci4orm":"dev-master"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "AndikAryanto11\\": "src/"
+        }
+    }
+    
+}
