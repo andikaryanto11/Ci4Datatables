@@ -1,7 +1,8 @@
 <?php 
 namespace AndikAryanto11;
 
-use DatatablesException;
+use AndikAryanto11\Exception\DatatablesException;
+use Exception;
 
 class Datatables {
 
@@ -39,13 +40,13 @@ class Datatables {
     }
 
     public function eloquent(string $eloquentNameSpace){
-        if(is_subclass_of($eloquentNameSpace, "Eloquent")){
+        if(is_subclass_of($eloquentNameSpace, "AndikAryanto11\Eloquent")){
             $this->eloquent = $eloquentNameSpace;
             $this->isEloquent = true;
             return $this;
         }
 
-        throw new DatatablesException( $eloquentNameSpace. "Is Not Instance of AndikAryanto11\Eloquent");
+        throw new DatatablesException( $eloquentNameSpace. " Is Not Instance of AndikAryanto11\Eloquent");
     }
 
     public function populate(){
@@ -65,9 +66,10 @@ class Datatables {
 
                 if ($this->request->getGet('length') != -1) {
                     $params['limit'] = array(
-                        'page' => $this->request->getGet('start') + 1,
-                        'size' => $this->request->getGet('length')
+                        'page' => $this->request->getGet('start') / $this->request->getGet('length') + 1,
+                        'size' => (int)$this->request->getGet('length')
                     );
+                    
                 }
 
                 if ($this->request->getGet('search') && $this->request->getGet('search')['value'] != '') {
@@ -75,7 +77,7 @@ class Datatables {
 
                     foreach ($this->column as $column) {
                         if ($column['searchable']) {
-                            $params['group']['orlike'][$column['column']] = $searchValue;
+                            $params['orLike'][$column['column']] = $searchValue;
                         }
                     }
                 }
@@ -88,18 +90,20 @@ class Datatables {
                             $this->column[$order['column']]['column'] =>  $order['dir'] === 'asc' ? "ASC" : "DESC"
                         );
                 } 
-                // echo \json_encode($_GET);
-                $result = $eloquent::findAll($params);
+                $result = $this->eloquent::findAll($params);
 
                 $this->output["draw"] = !empty($this->request->getGet('draw')) ? intval($this->request->getGet('draw')) : 0;
                 $this->output["recordsTotal"] = intval(count($result));
                 $this->output["recordsFiltered"] = intval($this->allData($params));
                 $this->output["data"] = $this->output($result);
+
             }
 
         } catch(Exception $e){
-            
+            $this->output["error"] = $e->getMessage();
         }
+        
+        return $this->output;
     }
 
     private function allData($filter = array())
@@ -114,7 +118,7 @@ class Datatables {
             'orLike' => isset($filter['orLike']) ? $filter['orLike'] : null,
             'group' => isset($filter['group']) ? $filter['group'] : null,
         );
-        return $eloquent::count($params);
+        return $this->eloquent::count($params);
     }
 
     public function addColumn($column, $foreignKey = null, $callback = null, $searchable = true, $orderable = true, $isdefaultorder = false)
@@ -142,8 +146,9 @@ class Datatables {
             foreach ($this->column as $column) {
                 $rowdata = null;
                 
-                if(!is_null($column['callback']))
+                if(!is_null($column['callback'])){
                     $rowdata = $column['callback']($data);
+                }
                 else {
                     $rowdata = $this->getColValue($column, $data);
                 }
