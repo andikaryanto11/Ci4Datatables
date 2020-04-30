@@ -24,7 +24,7 @@ class Datatables {
         "data" => null
     );
 
-    public function __construct($filter)
+    public function __construct($filter = array())
     {
         $this->request = \Config\Services::request();
         if (!empty($filter))
