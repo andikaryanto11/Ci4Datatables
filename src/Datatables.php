@@ -1,7 +1,7 @@
 <?php 
 namespace AndikAryanto11;
+use AndikAryanto11\Exception\DtTablesException;
 
-use AndikAryanto11\Exception\DatatablesException;
 use Exception;
 
 class Datatables {
@@ -40,13 +40,13 @@ class Datatables {
     }
 
     public function eloquent(string $eloquentNameSpace){
-        if(is_subclass_of($eloquentNameSpace, "AndikAryanto11\Eloquent")){
+        // if(is_subclass_of($eloquentNameSpace, "AndikAryanto11\Eloquent")){
             $this->eloquent = $eloquentNameSpace;
             $this->isEloquent = true;
             return $this;
-        }
+        // }
 
-        throw new DatatablesException( $eloquentNameSpace. " Is Not Instance of AndikAryanto11\Eloquent");
+        // throw new DtTablesException($eloquentNameSpace. " Is Not Instance of AndikAryanto11\Eloquent");
     }
 
     public function populate(){
@@ -58,6 +58,7 @@ class Datatables {
                 $params['join'] = isset($this->filter['join']) ? $this->filter['join'] : null;
                 $params['where'] = isset($this->filter['where']) ? $this->filter['where'] : null;
                 $params['whereIn'] = isset($this->filter['whereIn']) ? $this->filter['whereIn'] : null;
+                $params['orWhereIn'] = isset($this->filter['orWhereIn']) ? $this->filter['orWhereIn'] : null;
                 $params['orWhere'] = isset($this->filter['orWhere']) ? $this->filter['orWhere'] : null;
                 $params['whereNotIn'] = isset($this->filter['whereNotIn']) ? $this->filter['whereNotIn'] : null;
                 $params['like'] = isset($this->filter['like']) ? $this->filter['like'] : null;
@@ -103,7 +104,7 @@ class Datatables {
             $this->output["error"] = $e->getMessage();
         }
         
-        return $this->output;
+        return $this->output; 
     }
 
     private function allData($filter = array())
@@ -191,9 +192,10 @@ class Datatables {
             if(!is_null($column['column'])){
                 $col = explode(".", $column['column']);
                 if(count($col) == 2){
-                    if($this->isEloquent::$table != $col[0]){
+                    $newobj = new $this->eloquent;
+                    if($newobj->getTableName() != $col[0]){
                         $selectedColumn = $col[1];
-                        return $data->hasOne($nameSpace[0]."\\".$nameSpace[1]."\\".$col[0], $column['foreignKey'])->$selectedColumn;
+                        return $data->hasOneOrNew($nameSpace[0]."\\".$nameSpace[1]."\\".$col[0], $column['foreignKey'])->$selectedColumn;
                     } else {
                         $selectedColumn = $col[1];
                         return $data->$selectedColumn;
