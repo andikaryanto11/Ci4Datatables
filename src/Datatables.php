@@ -17,7 +17,7 @@ class Datatables {
     protected $columnCounter = 0;
     protected $column = array();
     protected $dtTableColumns = array();
-    
+
     protected $output = array(
         "draw" => null,
         "recordsTotal" => null,
@@ -25,17 +25,21 @@ class Datatables {
         "data" => null
     );
 
-    public function __construct($filter = array())
+    public function __construct($filter = array(), $useIndex = true)
     {
         $this->request = \Config\Services::request();
         if (!empty($filter))
             $this->filter = $filter;
             
-        if(!is_numeric($this->request->getGet('columns')[0]['data'])){
-            $this->dtTableColumns = $this->request->getGet('columns');
+        if(!$useIndex){
             $this->useIndex = false;
-        } else {
-            $this->useIndex = true;
+        } else{
+            if(!is_numeric($this->request->getGet('columns')[0]['data'])){
+                $this->dtTableColumns = $this->request->getGet('columns');
+                $this->useIndex = false;
+            } else {
+                $this->useIndex = true;
+            }
         }
     }
 
@@ -49,48 +53,53 @@ class Datatables {
         // throw new DtTablesException($eloquentNameSpace. " Is Not Instance of AndikAryanto11\Eloquent");
     }
 
+    public function setParams(){
+        $params = array();
+        $params['join'] = isset($this->filter['join']) ? $this->filter['join'] : null;
+        $params['where'] = isset($this->filter['where']) ? $this->filter['where'] : null;
+        $params['whereIn'] = isset($this->filter['whereIn']) ? $this->filter['whereIn'] : null;
+        $params['orWhereIn'] = isset($this->filter['orWhereIn']) ? $this->filter['orWhereIn'] : null;
+        $params['orWhere'] = isset($this->filter['orWhere']) ? $this->filter['orWhere'] : null;
+        $params['whereNotIn'] = isset($this->filter['whereNotIn']) ? $this->filter['whereNotIn'] : null;
+        $params['like'] = isset($this->filter['like']) ? $this->filter['like'] : null;
+        $params['orLike'] = isset($this->filter['orLike']) ? $this->filter['orLike'] : null;
+        $params['group'] = isset($this->filter['group']) ? $this->filter['group'] : null;
+
+        if ($this->request->getGet('length') != -1) {
+            $params['limit'] = array(
+                'page' => $this->request->getGet('start') / $this->request->getGet('length') + 1,
+                'size' => (int)$this->request->getGet('length')
+            );
+            
+        }
+
+        if ($this->request->getGet('search') && $this->request->getGet('search')['value'] != '') {
+            $searchValue = $this->request->getGet('search')['value'];
+
+            foreach ($this->column as $column) {
+                if ($column['searchable']) {
+                    $params['orLike'][$column['column']] = $searchValue;
+                }
+            }
+        }
+
+        if ($this->request->getGet('order') && count($this->request->getGet('order'))) {
+            $order = $this->request->getGet('order')[0];
+
+            if (isset($this->column[$order['column']]) && $this->column[$order['column']]['orderable'])
+                $params['order'] = array(
+                    $this->column[$order['column']]['column'] =>  $order['dir'] === 'asc' ? "ASC" : "DESC"
+                );
+        } 
+        return $params;
+    }
+
     public function populate(){
         try{
 
             if($this->isEloquent){
                 
-                $params = array();
-                $params['join'] = isset($this->filter['join']) ? $this->filter['join'] : null;
-                $params['where'] = isset($this->filter['where']) ? $this->filter['where'] : null;
-                $params['whereIn'] = isset($this->filter['whereIn']) ? $this->filter['whereIn'] : null;
-                $params['orWhereIn'] = isset($this->filter['orWhereIn']) ? $this->filter['orWhereIn'] : null;
-                $params['orWhere'] = isset($this->filter['orWhere']) ? $this->filter['orWhere'] : null;
-                $params['whereNotIn'] = isset($this->filter['whereNotIn']) ? $this->filter['whereNotIn'] : null;
-                $params['like'] = isset($this->filter['like']) ? $this->filter['like'] : null;
-                $params['orLike'] = isset($this->filter['orLike']) ? $this->filter['orLike'] : null;
-                $params['group'] = isset($this->filter['group']) ? $this->filter['group'] : null;
-
-                if ($this->request->getGet('length') != -1) {
-                    $params['limit'] = array(
-                        'page' => $this->request->getGet('start') / $this->request->getGet('length') + 1,
-                        'size' => (int)$this->request->getGet('length')
-                    );
-                    
-                }
-
-                if ($this->request->getGet('search') && $this->request->getGet('search')['value'] != '') {
-                    $searchValue = $this->request->getGet('search')['value'];
-
-                    foreach ($this->column as $column) {
-                        if ($column['searchable']) {
-                            $params['orLike'][$column['column']] = $searchValue;
-                        }
-                    }
-                }
-
-                if ($this->request->getGet('order') && count($this->request->getGet('order'))) {
-                    $order = $this->request->getGet('order')[0];
-
-                    if (isset($this->column[$order['column']]) && $this->column[$order['column']]['orderable'])
-                        $params['order'] = array(
-                            $this->column[$order['column']]['column'] =>  $order['dir'] === 'asc' ? "ASC" : "DESC"
-                        );
-                } 
+                $params = $this->setParams();
                 $result = $this->eloquent::findAll($params);
 
                 $this->output["draw"] = !empty($this->request->getGet('draw')) ? intval($this->request->getGet('draw')) : 0;
@@ -157,7 +166,14 @@ class Datatables {
                 if ($this->useIndex){
                     $row[] = $rowdata;
                 } else {
-                    $row[$this->dtTableColumns[$i]['data']] = $rowdata;
+                    $selectedColumn = "";
+                    $col = explode(".", $column['column']);
+                    if(count($col) == 2){
+                        $selectedColumn = $col[1];
+                    } else {
+                        $selectedColumn = $col[0];
+                    }
+                    $row[$selectedColumn] = $rowdata;
                 }
 
                 if ($this->dtRowId && $this->dtRowId == $column['column']) {
@@ -207,6 +223,10 @@ class Datatables {
             }
         }
         return null;
+    }
+
+    public function getColumns(){
+        return $this->column;
     }
 
 }
