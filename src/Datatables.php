@@ -17,6 +17,7 @@ class Datatables {
     protected $columnCounter = 0;
     protected $column = array();
     protected $dtTableColumns = array();
+    protected $returnEntity = false;
 
     protected $output = array(
         "draw" => null,
@@ -25,7 +26,7 @@ class Datatables {
         "data" => null
     );
 
-    public function __construct($filter = array(), $useIndex = true)
+    public function __construct($filter = array(), $returnEntity = true, $useIndex = true)
     {
         $this->request = \Config\Services::request();
         if (!empty($filter))
@@ -41,12 +42,14 @@ class Datatables {
                 $this->useIndex = true;
             }
         }
+
+        $this->returnEntity = $returnEntity;
     }
 
     public function eloquent(string $eloquentNameSpace){
         // if(is_subclass_of($eloquentNameSpace, "AndikAryanto11\Eloquent")){
             $this->eloquent = $eloquentNameSpace;
-            $this->isEloquent = true;
+            $this->isEloquent = $this->returnEntity ? true : false;
             return $this;
         // }
 
@@ -78,7 +81,13 @@ class Datatables {
 
             foreach ($this->column as $column) {
                 if ($column['searchable']) {
-                    $params['orLike'][$column['column']] = $searchValue;
+                    $col = explode(".", $column['column']);
+                    if(count($col) == 3)
+                        $params['orLike'][$col[0].".".$col[1]] = $searchValue;
+                    else if(count($col) == 2)
+                        $params['orLike'][$col[0].".".$col[1]] = $searchValue;
+                    else 
+                        $params['orLike'][$column['column']] = $searchValue;
                 }
             }
         }
@@ -97,17 +106,18 @@ class Datatables {
     public function populate(){
         try{
 
-            if($this->isEloquent){
+            // if($this->isEloquent){
                 
                 $params = $this->setParams();
-                $result = $this->eloquent::findAll($params);
+                // return $this->getColumnsOnly();
+                $result = $this->eloquent::findAll($params, $this->returnEntity, $this->getColumnsOnly());
 
                 $this->output["draw"] = !empty($this->request->getGet('draw')) ? intval($this->request->getGet('draw')) : 0;
                 $this->output["recordsTotal"] = intval(count($result));
                 $this->output["recordsFiltered"] = intval($this->allData($params));
                 $this->output["data"] = $this->output($result);
 
-            }
+            // }
 
         } catch(Exception $e){
             $this->output["error"] = $e->getMessage();
@@ -128,7 +138,8 @@ class Datatables {
             'orLike' => isset($filter['orLike']) ? $filter['orLike'] : null,
             'group' => isset($filter['group']) ? $filter['group'] : null,
         );
-        return $this->eloquent::count($params);
+        // return null;
+        return $this->eloquent::count($params, $this->returnEntity, $this->getColumnsOnly());
     }
 
     public function addColumn($column, $foreignKey = null, $callback = null, $searchable = true, $orderable = true, $isdefaultorder = false)
@@ -168,7 +179,9 @@ class Datatables {
                 } else {
                     $selectedColumn = "";
                     $col = explode(".", $column['column']);
-                    if(count($col) == 2){
+                    if(count($col) == 3){
+                        $selectedColumn = $col[2];
+                    } else if(count($col) == 2){
                         $selectedColumn = $col[1];
                     } else {
                         $selectedColumn = $col[0];
@@ -202,12 +215,12 @@ class Datatables {
     }
 
     private function getColValue($column, $data){
-        if($this->isEloquent){
+        if($this->returnEntity){
             $nameSpace = explode("\\", $this->eloquent);
 
             if(!is_null($column['column'])){
                 $col = explode(".", $column['column']);
-                if(count($col) == 2){
+                if(count($col) == 3){
                     $newobj = new $this->eloquent;
                     if($newobj->getTableName() != $col[0]){
                         $selectedColumn = $col[1];
@@ -221,12 +234,39 @@ class Datatables {
                     return $data->$selectedColumn;
                 }
             }
+        } else {
+            $col = explode(".", $column['column']);
+            $columnname = null;
+            if(count($col) == 3){
+                $columnname = $col[2];
+                return $data->$columnname;
+            } else if(count($col) == 2){
+                $columnname = $col[1];
+                return $data->$columnname;
+            } else {
+                $columnname = $column['column'];
+                return $data->$columnname;
+            }
         }
         return null;
     }
 
     public function getColumns(){
         return $this->column;
+    }
+
+    private function getColumnsOnly(){
+        $columns = [];
+        foreach($this->column as $column){
+            $col = explode(".", $column['column']);
+            if(count($col) == 3){
+                $columns[] =  $col[0].".".$col[1]." ".$col[2];
+            } else {
+                $columns[] = $column['column'];
+            }
+            
+        }
+        return $columns;
     }
 
 }
