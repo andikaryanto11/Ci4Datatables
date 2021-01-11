@@ -269,11 +269,14 @@ class Datatables
     {
         $columns = [];
         foreach ($this->column as $column) {
-            $col = explode(".", $column['column']);
-            if (count($col) == 3) {
-                $columns[] =  $col[0] . "." . $col[1] . " " . $col[2];
-            } else {
-                $columns[] = $column['column'];
+
+            if (!empty($column['column'])) {
+                $col = explode(".", $column['column']);
+                if (count($col) == 3) {
+                    $columns[] =  $col[0] . "." . $col[1] . " " . $col[2];
+                } else {
+                    $columns[] = $column['column'];
+                }
             }
         }
         return $columns;
